@@ -23,8 +23,9 @@ if 'step' not in st.session_state:
 
 st.title("在线模型结果标注工具")
 
-# 步骤导航栏
+# 步骤导航栏与可视化指示
 step = st.sidebar.radio("操作步骤", ["1. 上传文件", "2. 字段配置", "3. 开始标注", "4. 导出结果"])
+st.progress((int(step[0]) - 1) / 3)
 if step.startswith("1"):
     st.session_state.step = 1
 elif step.startswith("2"):
@@ -52,12 +53,19 @@ def upload_data():
         st.session_state.annotations = {}
         st.session_state.current_index = 0
         st.success(f"成功读取 {len(df)} 条数据")
-        st.session_state.step = 2
-        st.experimental_rerun()
+
+        if st.button("进入下一步配置字段类型"):
+            st.session_state.step = 2
 
 # 二、定义字段类型
 
 def configure_fields():
+    # 这一行在 configure_fields 内已存在，此处忽略重复定义
+    st.subheader("字段类型配置")
+
+    st.markdown("#### 原始文档预览 (前5行)")
+    st.dataframe(df.head(5), use_container_width=True)
+
     df = st.session_state.data
     st.subheader("字段类型配置")
 
@@ -83,9 +91,10 @@ def configure_fields():
         elif col_type == "备注项（文本输入）":
             types[col]['max_length'] = 50
 
-    if st.button("完成配置"):
+    if st.button("完成配置，开始标注"):
         st.session_state.field_types = types
-        st.success("配置完成，可前往下一步开始标注")
+        st.session_state.step = 3
+        st.success("配置完成，已跳转至标注界面")
 
 # 格式化模型结果文本
 def format_model_output(text):
