@@ -99,29 +99,32 @@ def format_model_output(text):
     text = text.replace("\\n", "\n").replace("\\t", "  ")
     text = re.sub(r'[\"}\']', '', text)
 
-    formatted = []
-
-    # 检测到 public_answer 前自动换行
+    # 在 public_answer 和 原始条款编号 前强制换行
     text = re.sub(r'(public_answer[:：])', r'\n\1', text, flags=re.IGNORECASE)
+    text = re.sub(r'(原始条款编号[:：]\s*\[.*?\])', r'\n\1', text, flags=re.IGNORECASE)
 
-    lines = text.splitlines()
-    for line in lines:
-        line = line.strip()
-        if line.lower().startswith("private_answer"):
-            formatted.append(f"**{line}**")
-        elif line.lower().startswith("public_answer"):
-            formatted.append(f"**{line}**")
-        elif line.startswith("###"):
-            formatted.append(f"**{line[3:].strip()}**")
-        elif line.startswith("##"):
-            formatted.append(f"**{line[2:].strip()}**")
-        elif line.startswith("#"):
-            formatted.append(f"**{line[1:].strip()}**")
-        else:
-            formatted.append(line)
+    private_match = re.search(r'(private_answer[:：])(.*?)(?=public_answer[:：]|$)', text, re.IGNORECASE | re.DOTALL)
+    public_match = re.search(r'(public_answer[:：])(.*)', text, re.IGNORECASE | re.DOTALL)
 
+    formatted = []
+    if private_match:
+        formatted.append(f"**{private_match.group(1).strip()}** {private_match.group(2).strip()}")
+    if public_match:
+        formatted.append(f"**{public_match.group(1).strip()}** {public_match.group(2).strip()}")
+
+    if not formatted:
+        lines = text.splitlines()
+        for line in lines:
+            line = line.strip()
+            if line.startswith("###"):
+                formatted.append(f"**{line[3:].strip()}**")
+            elif line.startswith("##"):
+                formatted.append(f"**{line[2:].strip()}**")
+            elif line.startswith("#"):
+                formatted.append(f"**{line[1:].strip()}**")
+            else:
+                formatted.append(line)
     return "\n".join(formatted)
-
 
 
 # 标注页面
