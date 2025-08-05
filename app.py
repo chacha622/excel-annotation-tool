@@ -25,6 +25,8 @@ if "df" not in st.session_state:
 st.header("Step 1: 上传文件")
 uploaded_file = st.file_uploader("上传 Excel/CSV/JSON 文件", type=[".xlsx", ".csv", ".json"])
 
+df = None  # ✅ 避免 NameError
+
 if uploaded_file:
     if uploaded_file.name.endswith(".xlsx"):
         df = pd.read_excel(uploaded_file)
