@@ -119,14 +119,16 @@ def annotation_page():
     annotation = st.session_state.annotations.get(index, {})
 
     for col, meta in config.items():
+        st.markdown(f"**字段类型：{meta['type']}**")
         if meta['type'] == "问题（仅展示）":
             st.markdown(f"**{col}:** {row[col]}")
         elif meta['type'] == "模型结果（展示+处理）":
             content = format_model_output(row[col])
             st.markdown(f"**{col}:**\n{content}")
         elif meta['type'] == "标注项（单选）":
-            selected = st.radio(f"{col}", meta['options'], key=f"{index}_{col}_radio", index=meta['options'].index(annotation.get(col, meta['options'][0])) if annotation.get(col) else 0)
-            annotation[col] = selected
+            selected = st.radio(f"{col}", meta['options'], key=f"{index}_{col}_radio", index=meta['options'].index(annotation[col]) if annotation.get(col) else None)
+            if selected:
+                annotation[col] = selected
         elif meta['type'] == "备注项（文本输入）":
             note = st.text_input(f"{col} (最多 {meta['max_length']} 字)", value=annotation.get(col, ""), max_chars=meta['max_length'], key=f"{index}_{col}_note")
             annotation[col] = note
@@ -140,13 +142,17 @@ def annotation_page():
 
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("上一条") and index > 0:
+        if st.button("上一条"):
             save_current()
-            st.session_state.current_index -= 1
+            if index > 0:
+                st.session_state.current_index -= 1
+                st.rerun()
     with col2:
-        if st.button("下一条") and index < len(df) - 1:
+        if st.button("下一条"):
             save_current()
-            st.session_state.current_index += 1
+            if index < len(df) - 1:
+                st.session_state.current_index += 1
+                st.rerun()
 
     st.progress((index + 1) / len(df))
 
