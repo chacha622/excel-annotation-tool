@@ -36,13 +36,16 @@ if uploaded_file:
         st.error("不支持的文件格式")
         df = None
 
-    if df is not None:
-        st.session_state.df = df.copy()
-        st.success(f"成功读取 {len(df)} 条数据")
-        st.dataframe(df.head())
-        st.session_state.settings_confirmed = False
+   # Step 1: 上传并读取文件
+if df is not None:
+    st.session_state.df = df.copy()
+    st.success(f"成功读取 {len(df)} 条数据")
+    st.dataframe(df.head())
+    st.session_state.settings_confirmed = False
 
 # Step 2: 定义字段类型
+confirm = False  # 预设变量，避免未定义错误
+
 if st.session_state.df is not None and not st.session_state.settings_confirmed:
     df = st.session_state.df
     st.header("Step 2: 字段配置")
@@ -53,19 +56,19 @@ if st.session_state.df is not None and not st.session_state.settings_confirmed:
         note_columns = st.multiselect("请选择备注字段（限50字输入）", df.columns.tolist())
         confirm = st.form_submit_button("确认配置")
 
-if confirm:
-    st.session_state.column_roles = {
-        "problem": problem_columns,
-        "model": model_columns,
-        "label": label_columns,
-        "note": note_columns
-    }
-    for col in label_columns + note_columns:
-        if col not in df.columns:
-            df[col] = ""
-    st.session_state.settings_confirmed = True
-    st.session_state.trigger_rerun = True  # 标记重载
-    
+    if confirm:
+        st.session_state.column_roles = {
+            "problem": problem_columns,
+            "model": model_columns,
+            "label": label_columns,
+            "note": note_columns
+        }
+        for col in label_columns + note_columns:
+            if col not in df.columns:
+                df[col] = ""
+        st.session_state.settings_confirmed = True
+        st.session_state.trigger_rerun = True  # 标记重载
+
 # 安全的延迟触发 rerun
 if st.session_state.get("trigger_rerun", False):
     st.session_state.trigger_rerun = False
