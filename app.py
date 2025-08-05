@@ -121,6 +121,12 @@ if st.session_state.df is not None and st.session_state.settings_confirmed:
             key=f"note_{col}_{index}"
         )
 
+if "current_index" not in st.session_state:
+    st.session_state.current_index = 0
+
+df = st.session_state.df
+index = st.session_state.current_index
+
 col1, col2, col3 = st.columns(3)
 
 with col1:
@@ -135,6 +141,7 @@ with col2:
             df.at[index, k] = v
         for k, v in note_inputs.items():
             df.at[index, k] = v
+        st.session_state.df = df  # 记得同步回 session_state
         st.success("保存成功！")
 
 with col3:
@@ -142,6 +149,7 @@ with col3:
         if index < len(df) - 1:
             st.session_state.current_index += 1
             st.experimental_rerun()
+
 
 st.progress((index + 1) / len(df))
 
