@@ -1,12 +1,16 @@
 # 本脚本需运行在安装有 streamlit 和 pandas 等依赖的环境中
 # 请先安装所需依赖：pip install streamlit pandas openpyxl xlsxwriter
 
-import streamlit as st
-import pandas as pd
-import json
-import io
-import re
+try:
+    import streamlit as st
+    import pandas as pd
+    import json
+    import io
+    import re
+except ModuleNotFoundError:
+    raise ModuleNotFoundError("请在含有 streamlit 的 Python 环境中运行此程序，或使用 'pip install streamlit pandas openpyxl xlsxwriter' 安装所需依赖")
 
+# 以下代码逻辑与原始一致
 # 状态持久化
 if 'data' not in st.session_state:
     st.session_state.data = None
@@ -21,7 +25,6 @@ if 'step' not in st.session_state:
 
 st.title("在线模型结果标注工具")
 
-# 步骤导航栏与可视化指示
 step = st.sidebar.radio("操作步骤", ["1. 上传文件", "2. 字段配置", "3. 开始标注", "4. 导出结果"], key="step_selector")
 if step.startswith("1"):
     st.session_state.step = 1
@@ -31,10 +34,10 @@ elif step.startswith("3"):
     st.session_state.step = 3
 elif step.startswith("4"):
     st.session_state.step = 4
-step = f"{st.session_state.step}. " + ["上传文件", "字段配置", "开始标注", "导出结果"][st.session_state.step - 1]
+
 st.progress((st.session_state.step - 1) / 3)
 
-# 一、上传文件
+# 上传文件
 def upload_data():
     uploaded_file = st.file_uploader("上传数据文件 (支持 Excel/CSV/JSON)", type=["xlsx", "csv", "json"])
     if uploaded_file:
@@ -57,7 +60,7 @@ def upload_data():
             st.session_state.step = 2
             st.rerun()
 
-# 二、定义字段类型
+# 配置字段
 def configure_fields():
     df = st.session_state.data
     st.subheader("字段类型配置")
@@ -65,9 +68,7 @@ def configure_fields():
     st.markdown("#### 原始文档预览 (前5行)")
     st.dataframe(df.head(5), use_container_width=True)
 
-    label_choices = ["问题（仅展示）", "模型结果（展示+处理）", "标注项（单选）", "备注项（文本输入）", "忽略此列"]
     selected_mapping = {}
-
     for label_type in ["问题（仅展示）", "模型结果（展示+处理）", "标注项（单选）", "备注项（文本输入）"]:
         candidates = st.multiselect(f"选择对应为【{label_type}】的列", df.columns, key=f"multi_{label_type}")
         for col in candidates:
@@ -94,26 +95,33 @@ def configure_fields():
 # 格式化模型结果文本
 def format_model_output(text):
     text = str(text)
-    text = text.replace("\\n", "\n").replace("\\t", "  ")
+    text = text.replace("\n", "\n").replace("\t", "  ")
     text = re.sub(r'["}\']', '', text)
-    text = re.sub(r'(private_answer[:：])', r'\n\1', text, flags=re.IGNORECASE)
-    text = re.sub(r'(public_answer[:：])', r'\n\1', text, flags=re.IGNORECASE)
 
-    lines = text.splitlines()
+    private_match = re.search(r'(private_answer[:：])(.*?)(?=public_answer[:：]|$)', text, re.IGNORECASE | re.DOTALL)
+    public_match = re.search(r'(public_answer[:：])(.*)', text, re.IGNORECASE | re.DOTALL)
+
     formatted = []
-    for line in lines:
-        line = line.strip()
-        if line.startswith("###"):
-            formatted.append(f"**{line[3:].strip()}**")
-        elif line.startswith("##"):
-            formatted.append(f"**{line[2:].strip()}**")
-        elif line.startswith("#"):
-            formatted.append(f"**{line[1:].strip()}**")
-        else:
-            formatted.append(line)
+    if private_match:
+        formatted.append(f"**{private_match.group(1).strip()}** {private_match.group(2).strip()}")
+    if public_match:
+        formatted.append(f"**{public_match.group(1).strip()}** {public_match.group(2).strip()}")
+
+    if not formatted:
+        lines = text.splitlines()
+        for line in lines:
+            line = line.strip()
+            if line.startswith("###"):
+                formatted.append(f"**{line[3:].strip()}**")
+            elif line.startswith("##"):
+                formatted.append(f"**{line[2:].strip()}**")
+            elif line.startswith("#"):
+                formatted.append(f"**{line[1:].strip()}**")
+            else:
+                formatted.append(line)
     return "\n".join(formatted)
 
-# 三、标注页面
+# 标注页面
 def annotation_page():
     df = st.session_state.data
     index = st.session_state.current_index
@@ -128,8 +136,7 @@ def annotation_page():
         if meta['type'] == "问题（仅展示）":
             st.markdown(f"**{col}:** {row[col]}")
         elif meta['type'] == "模型结果（展示+处理）":
-            content = format_model_output(row[col])
-            st.markdown(f"**{col}:**\n{content}")
+            st.markdown(f"**{col}:**\n{format_model_output(row[col])}")
         elif meta['type'] == "标注项（单选）":
             selected = st.radio(f"{col}", meta['options'], key=f"{index}_{col}_radio", index=meta['options'].index(annotation[col]) if annotation.get(col) else None)
             if selected:
@@ -161,7 +168,7 @@ def annotation_page():
 
     st.progress((index + 1) / len(df))
 
-# 四、导出结果
+# 导出结果
 def export_results():
     df = st.session_state.data.copy()
     for idx, annotation in st.session_state.annotations.items():
