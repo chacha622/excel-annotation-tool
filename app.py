@@ -121,31 +121,30 @@ if st.session_state.df is not None and st.session_state.settings_confirmed:
             key=f"note_{col}_{index}"
         )
 
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("⬅ 上一个") and index > 0:
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    if st.button("⬅ 上一个"):
+        if index > 0:
             st.session_state.current_index -= 1
             st.experimental_rerun()
-    with col2:
-        if st.button("💾 保存本条"):
-            for k, v in label_inputs.items():
-                df.at[index, k] = v
-            for k, v in note_inputs.items():
-                df.at[index, k] = v
-            st.success("保存成功！")
-    with col3:
-if st.button("➡ 下一个"):
-    if index < len(df) - 1:
-        st.session_state.current_index += 1
-        st.experimental_rerun()
-        
-if st.button("⬅ 上一个"):
-    if index > 0:
-        st.session_state.current_index -= 1
-        st.experimental_rerun()
 
+with col2:
+    if st.button("💾 保存本条"):
+        for k, v in label_inputs.items():
+            df.at[index, k] = v
+        for k, v in note_inputs.items():
+            df.at[index, k] = v
+        st.success("保存成功！")
 
-    st.progress((index + 1) / len(df))
+with col3:
+    if st.button("➡ 下一个"):
+        if index < len(df) - 1:
+            st.session_state.current_index += 1
+            st.experimental_rerun()
+
+st.progress((index + 1) / len(df))
+
 
 # Step 4: 导出结果
 if st.session_state.df is not None and st.session_state.settings_confirmed:
