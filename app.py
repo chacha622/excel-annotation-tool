@@ -22,8 +22,17 @@ if 'step' not in st.session_state:
 st.title("在线模型结果标注工具")
 
 # 步骤导航栏与可视化指示
-step = st.sidebar.radio("操作步骤", ["1. 上传文件", "2. 字段配置", "3. 开始标注", "4. 导出结果"])
-st.progress((int(step[0]) - 1) / 3)
+step = st.sidebar.radio("操作步骤", ["1. 上传文件", "2. 字段配置", "3. 开始标注", "4. 导出结果"], key="step_selector")
+if step.startswith("1"):
+    st.session_state.step = 1
+elif step.startswith("2"):
+    st.session_state.step = 2
+elif step.startswith("3"):
+    st.session_state.step = 3
+elif step.startswith("4"):
+    st.session_state.step = 4
+step = f"{st.session_state.step}. " + ["上传文件", "字段配置", "开始标注", "导出结果"][st.session_state.step - 1]
+st.progress((st.session_state.step - 1) / 3)
 if step.startswith("1"):
     st.session_state.step = 1
 elif step.startswith("2"):
@@ -93,7 +102,8 @@ def configure_fields():
 # 格式化模型结果文本
 def format_model_output(text):
     text = str(text)
-    text = text.replace("/n", "\n").replace("/t", "  ")
+    text = text.replace("\n", "
+").replace("\t", "  ")
     lines = text.splitlines()
     formatted = []
     for line in lines:
@@ -105,7 +115,8 @@ def format_model_output(text):
             formatted.append(f"**{line[1:].strip()}**")
         else:
             formatted.append(line)
-    return "\n".join(formatted)
+    return "
+".join(formatted)
 
 # 三、标注页面
 def annotation_page():
