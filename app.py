@@ -40,10 +40,12 @@ if uploaded_file:
 
    # Step 1: 上传并读取文件
 if df is not None:
-    st.session_state.df = df.copy()
-    st.success(f"成功读取 {len(df)} 条数据")
-    st.dataframe(df.head())
-    st.session_state.settings_confirmed = False
+    # 仅在首次上传或新文件时重置
+    if st.session_state.df is None or not df.equals(st.session_state.df):
+        st.session_state.df = df.copy()
+        st.success(f"成功读取 {len(df)} 条数据")
+        st.dataframe(df.head())
+        st.session_state.settings_confirmed = False  # ✅ 只在首次/新文件时重置配置
 
 # Step 2: 定义字段类型
 confirm = False  # 预设变量，避免未定义错误
