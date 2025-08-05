@@ -96,13 +96,17 @@ def configure_fields():
 def format_model_output(text):
     import re
     text = str(text)
+
+    # 基础清理
     text = text.replace("\\n", "\n").replace("\\t", "  ")
     text = re.sub(r'[\"}\']', '', text)
+    text = re.sub(r'\{text:', '', text, flags=re.IGNORECASE)
 
-    # 在 public_answer 和 原始条款编号 前强制换行
+    # public_answer 和 原始条款编号 前换行
     text = re.sub(r'(public_answer[:：])', r'\n\1', text, flags=re.IGNORECASE)
     text = re.sub(r'(原始条款编号[:：]\s*\[.*?\])', r'\n\1', text, flags=re.IGNORECASE)
 
+    # 提取回答内容
     private_match = re.search(r'(private_answer[:：])(.*?)(?=public_answer[:：]|$)', text, re.IGNORECASE | re.DOTALL)
     public_match = re.search(r'(public_answer[:：])(.*)', text, re.IGNORECASE | re.DOTALL)
 
@@ -112,6 +116,7 @@ def format_model_output(text):
     if public_match:
         formatted.append(f"**{public_match.group(1).strip()}** {public_match.group(2).strip()}")
 
+    # 没有匹配则按行处理
     if not formatted:
         lines = text.splitlines()
         for line in lines:
@@ -124,6 +129,7 @@ def format_model_output(text):
                 formatted.append(f"**{line[1:].strip()}**")
             else:
                 formatted.append(line)
+
     return "\n".join(formatted)
 
 
