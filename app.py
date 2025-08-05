@@ -95,18 +95,30 @@ def configure_fields():
 # 格式化模型结果文本
 def format_model_output(text):
     text = str(text)
-    text = text.replace("\n", "\n").replace("\t", "  ")
-    text = re.sub(r'["}\']', '', text)
-
-    private_match = re.search(r'(private_answer[:：])(.*?)(?=public_answer[:：]|$)', text, re.IGNORECASE | re.DOTALL)
-    public_match = re.search(r'(public_answer[:：])(.*)', text, re.IGNORECASE | re.DOTALL)
+    text = text.replace("\\n", "\n").replace("\\t", "  ")
+    text = re.sub(r'[\"}\']', '', text)
 
     formatted = []
-    if private_match:
-        formatted.append(f"**{private_match.group(1).strip()}** {private_match.group(2).strip()}")
-    if public_match:
-        formatted.append(f"**{public_match.group(1).strip()}** {public_match.group(2).strip()}")
 
+    # 尝试解析 private_answer 和 public_answer
+    private_match = re.search(r'(private_answer[:：])\\s*(.*?)(?=public_answer[:：]|$)', text, re.IGNORECASE | re.DOTALL)
+    public_match = re.search(r'(public_answer[:：])\\s*(.*)', text, re.IGNORECASE | re.DOTALL)
+
+    if private_match:
+        content = private_match.group(2).strip()
+        lines = content.splitlines()
+        formatted.append(f"**{private_match.group(1).strip()}**")
+        for line in lines:
+            formatted.append(line.strip())
+
+    if public_match:
+        content = public_match.group(2).strip()
+        lines = content.splitlines()
+        formatted.append(f"**{public_match.group(1).strip()}**")
+        for line in lines:
+            formatted.append(line.strip())
+
+    # 如果没有匹配，则按一般规则处理所有内容
     if not formatted:
         lines = text.splitlines()
         for line in lines:
@@ -119,7 +131,9 @@ def format_model_output(text):
                 formatted.append(f"**{line[1:].strip()}**")
             else:
                 formatted.append(line)
+
     return "\n".join(formatted)
+
 
 # 标注页面
 def annotation_page():
