@@ -1,8 +1,13 @@
-import streamlit as st
-import pandas as pd
-import json
-import io
-import re
+# 注意：本脚本需运行在 streamlit 环境下（如 streamlit.io 或本地安装后使用 streamlit run）
+
+try:
+    import streamlit as st
+    import pandas as pd
+    import json
+    import io
+    import re
+except ModuleNotFoundError:
+    raise ModuleNotFoundError("请在含有 streamlit 的 Python 环境中运行此程序，或使用 'pip install streamlit pandas openpyxl xlsxwriter' 安装所需依赖")
 
 # 状态持久化
 if 'data' not in st.session_state:
@@ -35,6 +40,7 @@ def upload_data():
         st.session_state.config_done = False
         st.session_state.annotations = {}
         st.success(f"成功读取 {len(df)} 条数据")
+        st.experimental_rerun()
 
 # 二、定义字段类型
 def configure_fields():
