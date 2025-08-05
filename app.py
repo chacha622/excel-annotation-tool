@@ -33,14 +33,6 @@ elif step.startswith("4"):
     st.session_state.step = 4
 step = f"{st.session_state.step}. " + ["上传文件", "字段配置", "开始标注", "导出结果"][st.session_state.step - 1]
 st.progress((st.session_state.step - 1) / 3)
-if step.startswith("1"):
-    st.session_state.step = 1
-elif step.startswith("2"):
-    st.session_state.step = 2
-elif step.startswith("3"):
-    st.session_state.step = 3
-elif step.startswith("4"):
-    st.session_state.step = 4
 
 # 一、上传文件
 def upload_data():
@@ -102,8 +94,7 @@ def configure_fields():
 # 格式化模型结果文本
 def format_model_output(text):
     text = str(text)
-    text = text.replace("\n", "
-").replace("\t", "  ")
+    text = text.replace("\\n", "\n").replace("\\t", "  ")
     lines = text.splitlines()
     formatted = []
     for line in lines:
@@ -115,8 +106,7 @@ def format_model_output(text):
             formatted.append(f"**{line[1:].strip()}**")
         else:
             formatted.append(line)
-    return "
-".join(formatted)
+    return "\n".join(formatted)
 
 # 三、标注页面
 def annotation_page():
