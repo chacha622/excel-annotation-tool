@@ -1,193 +1,148 @@
-# ⚠️ 请注意：本脚本基于 Streamlit 框架运行。
-# 如果你在本地运行，请确保已使用 `pip install streamlit pandas xlsxwriter openpyxl` 安装依赖。
-
-import re
+import streamlit as st
 import pandas as pd
-from io import BytesIO
 import json
+import io
+import re
 
-try:
-    import streamlit as st
-except ImportError:
-    raise ImportError("本脚本需要在支持 Streamlit 的环境中运行。请本地执行：pip install streamlit")
-
-st.set_page_config(page_title="Excel 标注小工具", layout="wide")
-st.title("📄 Excel 文本标注小工具")
-
-# 初始化状态
-if "df" not in st.session_state:
-    st.session_state.df = None
+# 状态持久化
+if 'data' not in st.session_state:
+    st.session_state.data = None
+if 'config_done' not in st.session_state:
+    st.session_state.config_done = False
+if 'field_types' not in st.session_state:
+    st.session_state.field_types = {}
+if 'current_index' not in st.session_state:
     st.session_state.current_index = 0
-    st.session_state.settings_confirmed = False
-    st.session_state.column_roles = {}
+if 'annotations' not in st.session_state:
+    st.session_state.annotations = {}
 
-# 上传页面
-st.header("Step 1: 上传文件")
-uploaded_file = st.file_uploader("上传 Excel/CSV/JSON 文件", type=[".xlsx", ".csv", ".json"])
+st.title("在线模型结果标注工具")
 
-df = None  # ✅ 避免 NameError
-
-if uploaded_file:
-    if uploaded_file.name.endswith(".xlsx"):
-        df = pd.read_excel(uploaded_file)
-    elif uploaded_file.name.endswith(".csv"):
-        df = pd.read_csv(uploaded_file)
-    elif uploaded_file.name.endswith(".json"):
-        df = pd.read_json(uploaded_file)
-    else:
-        st.error("不支持的文件格式")
-        df = None
-
-   # Step 1: 上传并读取文件
-if df is not None:
-    # 仅在首次上传或新文件时重置
-    if st.session_state.df is None or not df.equals(st.session_state.df):
-        st.session_state.df = df.copy()
+# 一、上传文件
+def upload_data():
+    uploaded_file = st.file_uploader("上传数据文件 (支持 Excel/CSV/JSON)", type=["xlsx", "csv", "json"])
+    if uploaded_file:
+        if uploaded_file.name.endswith(".csv"):
+            df = pd.read_csv(uploaded_file)
+        elif uploaded_file.name.endswith(".xlsx"):
+            df = pd.read_excel(uploaded_file)
+        elif uploaded_file.name.endswith(".json"):
+            df = pd.read_json(uploaded_file)
+        else:
+            st.error("不支持的文件格式")
+            return
+        st.session_state.data = df
+        st.session_state.config_done = False
+        st.session_state.annotations = {}
         st.success(f"成功读取 {len(df)} 条数据")
-        st.dataframe(df.head())
-        st.session_state.settings_confirmed = False  # ✅ 只在首次/新文件时重置配置
 
-# Step 2: 定义字段类型
-confirm = False  # 预设变量，避免未定义错误
+# 二、定义字段类型
+def configure_fields():
+    df = st.session_state.data
+    st.subheader("字段类型配置")
+    types = {}
+    for col in df.columns:
+        st.markdown(f"### 字段: `{col}`")
+        type_choice = st.selectbox(f"选择 `{col}` 的类型", ["问题（仅展示）", "模型结果（展示+处理）", "标注项（单选）", "备注项（文本输入）"], key=f"type_{col}")
+        types[col] = {'type': type_choice}
 
-if st.session_state.df is not None and not st.session_state.settings_confirmed:
-    df = st.session_state.df
-    st.header("Step 2: 字段配置")
-    with st.form("define_columns"):
-        problem_columns = st.multiselect("请选择问题字段（仅展示）", df.columns.tolist())
-        model_columns = st.multiselect("请选择模型结果字段（格式化展示）", df.columns.tolist())
-        label_columns = st.multiselect("请选择分类标注字段（单选）", df.columns.tolist())
-        note_columns = st.multiselect("请选择备注字段（限50字输入）", df.columns.tolist())
-        confirm = st.form_submit_button("确认配置")
+        if type_choice == "标注项（单选）":
+            options = st.text_input(f"设置 `{col}` 可选项（用英文逗号分隔）", "正确,错误,不确定", key=f"opts_{col}")
+            types[col]['options'] = [o.strip() for o in options.split(",")]
+        elif type_choice == "备注项（文本输入）":
+            types[col]['max_length'] = 50
 
-# 修改后确认配置
-if confirm:
-    st.session_state.column_roles = {
-        "problem": problem_columns,
-        "model": model_columns,
-        "label": label_columns,
-        "note": note_columns
-    }
-    for col in label_columns + note_columns:
-        if col not in df.columns:
-            df[col] = ""
-    st.session_state.settings_confirmed = True
+    if st.button("完成配置"):
+        st.session_state.field_types = types
+        st.session_state.config_done = True
+        st.success("配置完成，进入标注页面")
 
-# 安全的延迟触发 rerun
-if st.session_state.get("trigger_rerun", False):
-    st.session_state.trigger_rerun = False
-    st.experimental_rerun()
+# 格式化模型结果文本
+def format_model_output(text):
+    text = str(text)
+    text = text.replace("/n", "\n").replace("/t", "  ")
+    lines = text.splitlines()
+    formatted = []
+    for line in lines:
+        if line.startswith("###"):
+            formatted.append(f"**{line[3:].strip()}**")
+        elif line.startswith("##"):
+            formatted.append(f"**{line[2:].strip()}**")
+        elif line.startswith("#"):
+            formatted.append(f"**{line[1:].strip()}**")
+        else:
+            formatted.append(line)
+    return "\n".join(formatted)
 
-
-# Step 3: 标注界面
-if st.session_state.df is not None and st.session_state.settings_confirmed:
-    df = st.session_state.df
-    roles = st.session_state.column_roles
+# 三、标注页面
+def annotation_page():
+    df = st.session_state.data
     index = st.session_state.current_index
+    config = st.session_state.field_types
+
+    st.subheader(f"当前第 {index + 1} / {len(df)} 条数据")
     row = df.iloc[index]
+    annotation = st.session_state.annotations.get(index, {})
 
-    def format_text(text):
-        if not isinstance(text, str):
-            return text
-        text = text.replace("/n", "\n").replace("/t", "  ")
-        text = re.sub(r"###(.*?)", r"**\\1**", text)
-        return text
+    for col, meta in config.items():
+        if meta['type'] == "问题（仅展示）":
+            st.markdown(f"**{col}:** {row[col]}")
+        elif meta['type'] == "模型结果（展示+处理）":
+            content = format_model_output(row[col])
+            st.markdown(f"**{col}:**\n{content}")
+        elif meta['type'] == "标注项（单选）":
+            selected = st.radio(f"{col}", meta['options'], key=f"{index}_{col}_radio", index=meta['options'].index(annotation.get(col, meta['options'][0])) if annotation.get(col) else 0)
+            annotation[col] = selected
+        elif meta['type'] == "备注项（文本输入）":
+            note = st.text_input(f"{col} (最多 {meta['max_length']} 字)", value=annotation.get(col, ""), max_chars=meta['max_length'], key=f"{index}_{col}_note")
+            annotation[col] = note
 
-    st.header("Step 3: 标注页面")
-    st.markdown(f"### 当前第 {index+1}/{len(df)} 条")
+    def save_current():
+        st.session_state.annotations[index] = annotation
 
-    for col in roles.get("problem", []):
-        st.markdown(f"**{col}：** {row[col]}")
+    if st.button("保存"):
+        save_current()
+        st.success("保存成功")
 
-    for col in roles.get("model", []):
-        st.markdown(f"**{col}：**")
-        st.markdown(format_text(str(row[col])), unsafe_allow_html=True)
-
-    label_inputs = {}
-    for col in roles.get("label", []):
-        label_inputs[col] = st.radio(
-            f"{col}（分类标注）",
-            ["正确", "错误", "不确定"],
-            index=["正确", "错误", "不确定"].index(str(row.get(col, "不确定"))) if row.get(col) in ["正确", "错误", "不确定"] else 2,
-            key=f"label_{col}_{index}"
-        )
-
-    note_inputs = {}
-    for col in roles.get("note", []):
-        note_inputs[col] = st.text_area(
-            f"{col}（备注，限50字）",
-            value=str(row.get(col, "")),
-            max_chars=50,
-            key=f"note_{col}_{index}"
-        )
-
-if "current_index" not in st.session_state:
-    st.session_state.current_index = 0
-
-df = st.session_state.df
-index = st.session_state.current_index
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    if st.button("⬅ 上一个"):
-        if index > 0:
-            st.session_state.current_index -= 1
-            st.experimental_rerun()
-
-with col2:
-    if st.button("💾 保存本条"):
-        for k, v in label_inputs.items():
-            df.at[index, k] = v
-        for k, v in note_inputs.items():
-            df.at[index, k] = v
-        st.session_state.df = df  # 记得同步回 session_state
-        st.success("保存成功！")
-
-with col3:
-    if st.button("➡ 下一个"):
-        if index < len(df) - 1:
-            st.session_state.current_index += 1
-            st.experimental_rerun()
-
-
-st.progress((index + 1) / len(df))
-
-
-# Step 4: 导出结果
-if st.session_state.df is not None and st.session_state.settings_confirmed:
-    st.header("Step 4: 导出结果")
-    def convert_to_format(df, fmt):
-        if fmt == "excel":
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-                df.to_excel(writer, index=False, sheet_name="标注结果")
-            return output.getvalue()
-        elif fmt == "csv":
-            return df.to_csv(index=False).encode("utf-8")
-        elif fmt == "json":
-            return df.to_json(orient="records", force_ascii=False, indent=2).encode("utf-8")
-        return None
-
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     with col1:
-        st.download_button(
-            "📥 导出为 Excel",
-            data=convert_to_format(st.session_state.df, "excel"),
-            file_name="标注结果.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        if st.button("上一条") and index > 0:
+            save_current()
+            st.session_state.current_index -= 1
     with col2:
-        st.download_button(
-            "📥 导出为 CSV",
-            data=convert_to_format(st.session_state.df, "csv"),
-            file_name="标注结果.csv",
-            mime="text/csv"
-        )
-    with col3:
-        st.download_button(
-            "📥 导出为 JSON",
-            data=convert_to_format(st.session_state.df, "json"),
-            file_name="标注结果.json",
-            mime="application/json"
-        )
+        if st.button("下一条") and index < len(df) - 1:
+            save_current()
+            st.session_state.current_index += 1
+
+    st.progress((index + 1) / len(df))
+
+# 四、导出结果
+def export_results():
+    df = st.session_state.data.copy()
+    for idx, annotation in st.session_state.annotations.items():
+        for col, val in annotation.items():
+            df.at[idx, f"标注_{col}"] = val
+
+    st.subheader("导出标注结果")
+    export_format = st.selectbox("选择导出格式", ["Excel", "CSV", "JSON"])
+    if st.button("导出"):
+        if export_format == "Excel":
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df.to_excel(writer, index=False)
+            st.download_button("下载 Excel 文件", data=output.getvalue(), file_name="annotation_result.xlsx")
+        elif export_format == "CSV":
+            csv = df.to_csv(index=False).encode('utf-8')
+            st.download_button("下载 CSV 文件", data=csv, file_name="annotation_result.csv")
+        elif export_format == "JSON":
+            json_data = df.to_json(orient='records', force_ascii=False)
+            st.download_button("下载 JSON 文件", data=json_data, file_name="annotation_result.json")
+
+# 页面逻辑控制
+if st.session_state.data is None:
+    upload_data()
+elif not st.session_state.config_done:
+    configure_fields()
+else:
+    annotation_page()
+    export_results()
