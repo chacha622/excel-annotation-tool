@@ -134,9 +134,16 @@ if st.session_state.df is not None and st.session_state.settings_confirmed:
                 df.at[index, k] = v
             st.success("保存成功！")
     with col3:
-        if st.button("➡ 下一个") and index < len(df) - 1:
-            st.session_state.current_index += 1
-            st.experimental_rerun()
+if st.button("➡ 下一个"):
+    if index < len(df) - 1:
+        st.session_state.current_index += 1
+        st.experimental_rerun()
+        
+if st.button("⬅ 上一个"):
+    if index > 0:
+        st.session_state.current_index -= 1
+        st.experimental_rerun()
+
 
     st.progress((index + 1) / len(df))
 
