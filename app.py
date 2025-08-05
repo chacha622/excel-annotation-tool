@@ -12,16 +12,27 @@ except ModuleNotFoundError:
 # 状态持久化
 if 'data' not in st.session_state:
     st.session_state.data = None
-if 'config_done' not in st.session_state:
-    st.session_state.config_done = False
 if 'field_types' not in st.session_state:
     st.session_state.field_types = {}
 if 'current_index' not in st.session_state:
     st.session_state.current_index = 0
 if 'annotations' not in st.session_state:
     st.session_state.annotations = {}
+if 'step' not in st.session_state:
+    st.session_state.step = 1
 
 st.title("在线模型结果标注工具")
+
+# 步骤导航栏
+step = st.sidebar.radio("操作步骤", ["1. 上传文件", "2. 字段配置", "3. 开始标注", "4. 导出结果"])
+if step.startswith("1"):
+    st.session_state.step = 1
+elif step.startswith("2"):
+    st.session_state.step = 2
+elif step.startswith("3"):
+    st.session_state.step = 3
+elif step.startswith("4"):
+    st.session_state.step = 4
 
 # 一、上传文件
 def upload_data():
@@ -37,31 +48,44 @@ def upload_data():
             st.error("不支持的文件格式")
             return
         st.session_state.data = df
-        st.session_state.config_done = False
+        st.session_state.field_types = {}
         st.session_state.annotations = {}
+        st.session_state.current_index = 0
         st.success(f"成功读取 {len(df)} 条数据")
+        st.session_state.step = 2
         st.experimental_rerun()
 
 # 二、定义字段类型
+
 def configure_fields():
     df = st.session_state.data
     st.subheader("字段类型配置")
+
+    label_choices = ["问题（仅展示）", "模型结果（展示+处理）", "标注项（单选）", "备注项（文本输入）", "忽略此列"]
+    selected_mapping = {}
+
+    for label_type in ["问题（仅展示）", "模型结果（展示+处理）", "标注项（单选）", "备注项（文本输入）"]:
+        candidates = st.multiselect(f"选择对应为【{label_type}】的列", df.columns, key=f"multi_{label_type}")
+        for col in candidates:
+            selected_mapping[col] = label_type
+
+    # 显示配置输入框
     types = {}
     for col in df.columns:
-        st.markdown(f"### 字段: `{col}`")
-        type_choice = st.selectbox(f"选择 `{col}` 的类型", ["问题（仅展示）", "模型结果（展示+处理）", "标注项（单选）", "备注项（文本输入）"], key=f"type_{col}")
-        types[col] = {'type': type_choice}
-
-        if type_choice == "标注项（单选）":
+        col_type = selected_mapping.get(col, "忽略此列")
+        if col_type == "忽略此列":
+            continue
+        st.markdown(f"### 字段: `{col}` → {col_type}")
+        types[col] = {'type': col_type}
+        if col_type == "标注项（单选）":
             options = st.text_input(f"设置 `{col}` 可选项（用英文逗号分隔）", "正确,错误,不确定", key=f"opts_{col}")
             types[col]['options'] = [o.strip() for o in options.split(",")]
-        elif type_choice == "备注项（文本输入）":
+        elif col_type == "备注项（文本输入）":
             types[col]['max_length'] = 50
 
     if st.button("完成配置"):
         st.session_state.field_types = types
-        st.session_state.config_done = True
-        st.success("配置完成，进入标注页面")
+        st.success("配置完成，可前往下一步开始标注")
 
 # 格式化模型结果文本
 def format_model_output(text):
@@ -145,10 +169,20 @@ def export_results():
             st.download_button("下载 JSON 文件", data=json_data, file_name="annotation_result.json")
 
 # 页面逻辑控制
-if st.session_state.data is None:
+if st.session_state.step == 1:
     upload_data()
-elif not st.session_state.config_done:
-    configure_fields()
-else:
-    annotation_page()
-    export_results()
+elif st.session_state.step == 2:
+    if st.session_state.data is not None:
+        configure_fields()
+    else:
+        st.warning("请先上传文件")
+elif st.session_state.step == 3:
+    if st.session_state.data is not None and st.session_state.field_types:
+        annotation_page()
+    else:
+        st.warning("请完成字段配置")
+elif st.session_state.step == 4:
+    if st.session_state.data is not None:
+        export_results()
+    else:
+        st.warning("暂无数据可导出")
