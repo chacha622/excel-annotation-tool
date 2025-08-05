@@ -94,45 +94,34 @@ def configure_fields():
 
 # 格式化模型结果文本
 def format_model_output(text):
+    import re
     text = str(text)
     text = text.replace("\\n", "\n").replace("\\t", "  ")
     text = re.sub(r'[\"}\']', '', text)
 
     formatted = []
 
-    # 尝试解析 private_answer 和 public_answer
-    private_match = re.search(r'(private_answer[:：])\\s*(.*?)(?=public_answer[:：]|$)', text, re.IGNORECASE | re.DOTALL)
-    public_match = re.search(r'(public_answer[:：])\\s*(.*)', text, re.IGNORECASE | re.DOTALL)
+    # 检测到 public_answer 前自动换行
+    text = re.sub(r'(public_answer[:：])', r'\n\1', text, flags=re.IGNORECASE)
 
-    if private_match:
-        content = private_match.group(2).strip()
-        lines = content.splitlines()
-        formatted.append(f"**{private_match.group(1).strip()}**")
-        for line in lines:
-            formatted.append(line.strip())
-
-    if public_match:
-        content = public_match.group(2).strip()
-        lines = content.splitlines()
-        formatted.append(f"**{public_match.group(1).strip()}**")
-        for line in lines:
-            formatted.append(line.strip())
-
-    # 如果没有匹配，则按一般规则处理所有内容
-    if not formatted:
-        lines = text.splitlines()
-        for line in lines:
-            line = line.strip()
-            if line.startswith("###"):
-                formatted.append(f"**{line[3:].strip()}**")
-            elif line.startswith("##"):
-                formatted.append(f"**{line[2:].strip()}**")
-            elif line.startswith("#"):
-                formatted.append(f"**{line[1:].strip()}**")
-            else:
-                formatted.append(line)
+    lines = text.splitlines()
+    for line in lines:
+        line = line.strip()
+        if line.lower().startswith("private_answer"):
+            formatted.append(f"**{line}**")
+        elif line.lower().startswith("public_answer"):
+            formatted.append(f"**{line}**")
+        elif line.startswith("###"):
+            formatted.append(f"**{line[3:].strip()}**")
+        elif line.startswith("##"):
+            formatted.append(f"**{line[2:].strip()}**")
+        elif line.startswith("#"):
+            formatted.append(f"**{line[1:].strip()}**")
+        else:
+            formatted.append(line)
 
     return "\n".join(formatted)
+
 
 
 # 标注页面
