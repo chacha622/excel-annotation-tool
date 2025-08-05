@@ -95,7 +95,7 @@ def configure_fields():
 def format_model_output(text):
     text = str(text)
     text = text.replace("\\n", "\n").replace("\\t", "  ")
-    text = re.sub(r'["}']', '', text)
+    text = re.sub(r'["}\']', '', text)
     text = re.sub(r'(private_answer[:：])', r'\n\1', text, flags=re.IGNORECASE)
     text = re.sub(r'(public_answer[:：])', r'\n\1', text, flags=re.IGNORECASE)
 
