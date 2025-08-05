@@ -1,13 +1,11 @@
-# 注意：本脚本需运行在 streamlit 环境下（如 streamlit.io 或本地安装后使用 streamlit run）
+# 本脚本需运行在安装有 streamlit 和 pandas 等依赖的环境中
+# 请先安装所需依赖：pip install streamlit pandas openpyxl xlsxwriter
 
-try:
-    import streamlit as st
-    import pandas as pd
-    import json
-    import io
-    import re
-except ModuleNotFoundError:
-    raise ModuleNotFoundError("请在含有 streamlit 的 Python 环境中运行此程序，或使用 'pip install streamlit pandas openpyxl xlsxwriter' 安装所需依赖")
+import streamlit as st
+import pandas as pd
+import json
+import io
+import re
 
 # 状态持久化
 if 'data' not in st.session_state:
@@ -56,18 +54,15 @@ def upload_data():
 
         if st.button("进入下一步配置字段类型"):
             st.session_state.step = 2
+            st.rerun()
 
 # 二、定义字段类型
-
 def configure_fields():
-    # 这一行在 configure_fields 内已存在，此处忽略重复定义
+    df = st.session_state.data
     st.subheader("字段类型配置")
 
     st.markdown("#### 原始文档预览 (前5行)")
     st.dataframe(df.head(5), use_container_width=True)
-
-    df = st.session_state.data
-    st.subheader("字段类型配置")
 
     label_choices = ["问题（仅展示）", "模型结果（展示+处理）", "标注项（单选）", "备注项（文本输入）", "忽略此列"]
     selected_mapping = {}
@@ -77,7 +72,6 @@ def configure_fields():
         for col in candidates:
             selected_mapping[col] = label_type
 
-    # 显示配置输入框
     types = {}
     for col in df.columns:
         col_type = selected_mapping.get(col, "忽略此列")
@@ -94,7 +88,7 @@ def configure_fields():
     if st.button("完成配置，开始标注"):
         st.session_state.field_types = types
         st.session_state.step = 3
-        st.success("配置完成，已跳转至标注界面")
+        st.rerun()
 
 # 格式化模型结果文本
 def format_model_output(text):
