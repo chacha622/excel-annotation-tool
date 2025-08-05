@@ -53,7 +53,7 @@ if st.session_state.df is not None and not st.session_state.settings_confirmed:
         note_columns = st.multiselect("请选择备注字段（限50字输入）", df.columns.tolist())
         confirm = st.form_submit_button("确认配置")
 
-        if confirm:
+if confirm:
     st.session_state.column_roles = {
         "problem": problem_columns,
         "model": model_columns,
