@@ -54,17 +54,23 @@ if st.session_state.df is not None and not st.session_state.settings_confirmed:
         confirm = st.form_submit_button("确认配置")
 
         if confirm:
-            st.session_state.column_roles = {
-                "problem": problem_columns,
-                "model": model_columns,
-                "label": label_columns,
-                "note": note_columns
-            }
-            for col in label_columns + note_columns:
-                if col not in df.columns:
-                    df[col] = ""
-            st.session_state.settings_confirmed = True
-            st.experimental_rerun()
+    st.session_state.column_roles = {
+        "problem": problem_columns,
+        "model": model_columns,
+        "label": label_columns,
+        "note": note_columns
+    }
+    for col in label_columns + note_columns:
+        if col not in df.columns:
+            df[col] = ""
+    st.session_state.settings_confirmed = True
+    st.session_state.trigger_rerun = True  # 标记重载
+    
+# 安全的延迟触发 rerun
+if st.session_state.get("trigger_rerun", False):
+    st.session_state.trigger_rerun = False
+    st.experimental_rerun()
+
 
 # Step 3: 标注界面
 if st.session_state.df is not None and st.session_state.settings_confirmed:
